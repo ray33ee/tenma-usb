@@ -7,9 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### To Do
 - Add native binary to sourceforge
 - Find a better way to select specific Tenma device if multiple devices are detected
-- Add verbose mode (via clap)
 
 ### Unfinished Ideas
+
+## [0.1.2] - 2021-03-13
+
+### Added
+- added code to configure endpoint
+- Parity detection
+- Verbosity command line option
+
+### Fixed
+- Various warnings cleared
 
 ## [0.1.1] - 2021-03-13
 

@@ -1,6 +1,6 @@
 [package]
 name = "tenma-usb"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["ray33ee <30669752+ray33ee@users.noreply.github.com>"]
 edition = "2018"
 
@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 rusb = "0.8.0"
+clap  = "2.33.3"
