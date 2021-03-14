@@ -5,7 +5,7 @@ use clap::{crate_version, Arg, App};
 use std::{time::Duration};
 
 
-//Attributes to connect to tenma device and endpoint
+//Attributes to connect to Tenma device and endpoint
 const TENMA_PRODUCT_ID: u16 = 57352;
 const TENMA_VENDOR_ID: u16 = 6790;
 const TENMA_READ_ENDPOINT: u8 = 0x82;
@@ -50,11 +50,77 @@ fn main() {
             .short("v")
             .long("verbose")
             .help("Increases debug output"))
+        .arg(Arg::with_name("time stamp")
+            .short("t")
+            .long("time")
+            .help("Add a time stamp to data (formatting in accordance with `chrono:format::strftime`")
+            .takes_value(true)
+            .validator(|val| {
+                let format_iter = chrono::format::strftime::StrftimeItems::new(&val);
+
+                for item in format_iter {
+                    if let chrono::format::Item::Error = item {
+                        return Err(String::from("Invalid date/time format. See Rust's chrono crate (specifically chrono:format::strftime) for more details."));
+                    }
+                }
+
+                Ok(())
+            } )
+            .required(false)
+            .min_values(0))
+        .arg(Arg::with_name("newline")
+            .short("n")
+            .long("newline")
+            .help("Specify new line characters")
+            .takes_value(true)
+            .required(false)
+            .possible_values(&["windows", "unix"]))
+        .arg(Arg::with_name("device selection")
+            .short("d")
+            .long("device")
+            .help("Select the nth Tenma device (defaults to the first)")
+            .takes_value(true)
+            .required(false)
+            .min_values(0)
+            .validator(|val|
+                match val.parse::<usize>() {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(format!("'{}' is not a valid number. Must be positive number greater than zero.", val))
+                }
+            ))
         .get_matches();
 
-    let verbose = match matches.value_of("verbosity") {
-        Some(_) => {true},
-        None => {false}
+
+
+    let verbose = matches.is_present("verbosity");
+
+
+    let is_unix_newline = if matches.is_present("newline") {
+        eprintln!("new: {}", matches.value_of("newline").unwrap());
+        match matches.value_of("newline").unwrap() {
+            "windows" => false,
+            "unix" => true,
+            _ => {panic!("Invalid value for 'newline' option.");}
+        }
+    } else {
+        false
+    };
+
+    eprintln!("Is unix {}", is_unix_newline);
+
+    let dt_format = if matches.is_present("time stamp") {
+        match matches.value_of("time stamp") {
+            Some(format) => {format}
+            None => {"%F %X"}
+        }
+    } else {
+        ""
+    };
+
+    let nth_device = if matches.is_present("device selection") {
+        matches.value_of("device selection").unwrap().parse::<usize>().unwrap() - 1
+    } else {
+        0
     };
 
     match rusb::devices() {
@@ -82,9 +148,17 @@ fn main() {
                 eprintln!("Tenma devices: {:?}", tenma_devices);
             }
 
-            assert_ne!(tenma_devices.len(), 0);
+            if tenma_devices.len() == 0 {
+                eprintln!("No valid Tenma devices detected. Aborting...");
+                std::process::exit(1);
+            }
 
-            let tenma_device = & mut tenma_devices[0];
+            if nth_device >= tenma_devices.len() {
+                eprintln!("{}th device does not exist (there are only {} devices)", nth_device+1, tenma_devices.len());
+                std::process::exit(2);
+            }
+
+            let tenma_device = & mut tenma_devices[nth_device];
 
             if verbose {
                 eprintln!("Chosen Tenma: {:?}", tenma_device.device_descriptor());
@@ -139,8 +213,23 @@ fn main() {
 
                                 if usb_reader_buffer[1] == DATA_TERMINATOR {
 
-                                    println!("{}", std::str::from_utf8(&tenma_data_buffer).unwrap());
 
+                                    //Modify the last bytes for a Windows vs Unix newline
+                                    let data = if is_unix_newline {
+                                        tenma_data_buffer[10] = '\n' as u8;
+                                        &tenma_data_buffer[0..11]
+                                    } else {
+                                        tenma_data_buffer[10] = '\r' as u8;
+                                        tenma_data_buffer[11] = '\n' as u8;
+                                        &tenma_data_buffer
+                                    } ;
+
+                                    if dt_format.is_empty() {
+                                        print!("{}", std::str::from_utf8(data).unwrap());
+                                    }
+                                    else {
+                                        print!("{} {}", chrono::Utc::now().format(dt_format), std::str::from_utf8(data).unwrap());
+                                    }
                                 }
                             }
                             Err(err) => panic!("could not read from endpoint: {}", err),

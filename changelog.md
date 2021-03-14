@@ -5,10 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 ### To Do
-- Add native binary to sourceforge
-- Find a better way to select specific Tenma device if multiple devices are detected
+- Write function to setup Tenma device  
 
 ### Unfinished Ideas
+
+## [0.1.3] - 2021-03-13
+
+### Added
+- We now panic if no valid devices are found
+- We now have the -t option that prepends the data string with a time stamp. By default it will print the date and time, but the user can specify their own format in accordance with the `chrono:format::strftime` format.
+- Native binary to sourceforge
+- newline option to modify the newline character(s)
+- Added device option to select Tenma device
+- Validator for custom date/time formats
 
 ## [0.1.2] - 2021-03-13
 
