@@ -40,7 +40,7 @@
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
   </component>
-  <component name="RunManager" selected="Cargo.Debug">
+  <component name="RunManager" selected="Cargo.Release">
     <configuration name="Debug" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
       <option name="command" value="run --package tenma-usb --bin tenma-usb -- -t" />
       <option name="workingDirectory" value="file://$PROJECT_DIR$" />

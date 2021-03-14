@@ -13,7 +13,7 @@ const TENMA_ENDPOINT_CONFIG: u8 = 1;
 const TENMA_ENDPOINT_INTERFACE: u8 = 0;
 const TENMA_ENDPOINT_SETTING: u8 = 0;
 
-const NO_DATA_IDENTIFIER: u8 = 0xF0;
+const DATA_IDENTIFIER: u8 = 0xF1;
 const DATA_TERMINATOR: u8 = 0x8A;
 
 fn get_parity(byte: u8) -> u8 {
@@ -68,13 +68,6 @@ fn main() {
             } )
             .required(false)
             .min_values(0))
-        .arg(Arg::with_name("newline")
-            .short("n")
-            .long("newline")
-            .help("Specify new line characters")
-            .takes_value(true)
-            .required(false)
-            .possible_values(&["windows", "unix"]))
         .arg(Arg::with_name("device selection")
             .short("d")
             .long("device")
@@ -94,19 +87,6 @@ fn main() {
 
     let verbose = matches.is_present("verbosity");
 
-
-    let is_unix_newline = if matches.is_present("newline") {
-        eprintln!("new: {}", matches.value_of("newline").unwrap());
-        match matches.value_of("newline").unwrap() {
-            "windows" => false,
-            "unix" => true,
-            _ => {panic!("Invalid value for 'newline' option.");}
-        }
-    } else {
-        false
-    };
-
-    eprintln!("Is unix {}", is_unix_newline);
 
     let dt_format = if matches.is_present("time stamp") {
         match matches.value_of("time stamp") {
@@ -182,54 +162,61 @@ fn main() {
                     handle.set_alternate_setting(TENMA_ENDPOINT_INTERFACE, TENMA_ENDPOINT_SETTING).unwrap();
 
                     let mut usb_reader_buffer = [0; 8];
-                    let timeout = Duration::from_secs(1);
 
-                    let mut tenma_data_buffer = [0; 12];
-                    let mut index = 1;
-
-                    tenma_data_buffer[0] = '0' as u8;
+                    let mut tenma_data_buffer = Vec::new();
+                    let mut bad_parity = false; // Set to true if any of the received data bytes contain parity errors
 
                     loop {
-                        match handle.read_interrupt(TENMA_READ_ENDPOINT, &mut usb_reader_buffer, timeout) {
+                        match handle.read_interrupt(TENMA_READ_ENDPOINT, &mut usb_reader_buffer, Duration::from_secs(1)) {
                             Ok(len) => {
+
                                 assert_eq!(len, 8);
 
-                                if usb_reader_buffer[0] == NO_DATA_IDENTIFIER {
-                                    index = 1;
-                                    tenma_data_buffer[0] = '0' as u8;
-                                } else {
-                                    tenma_data_buffer[index] = match check_parity(usb_reader_buffer[1]) {
+                                //If we have a byte to process, add it to the buffer
+                                if usb_reader_buffer[0] == DATA_IDENTIFIER {
+                                    tenma_data_buffer.push(match check_parity(usb_reader_buffer[1]) {
                                         Ok(byte) => {
                                             byte
                                         },
                                         Err(_) => {
-                                            tenma_data_buffer[0] = '1' as u8;
+                                            bad_parity = true;
                                             usb_reader_buffer[1]
+                                        }
+                                    });
+                                } else {
+                                    tenma_data_buffer.clear();
+                                }
+
+                                //If we find the data terminator, 0x0a (0x8A with odd parity), process the tenma buffer
+                                if usb_reader_buffer[1] == DATA_TERMINATOR {
+                                    let output_string = {
+                                        if !bad_parity {
+                                            if tenma_data_buffer.len() == 11 {
+                                                match std::str::from_utf8(&tenma_data_buffer[0..10]) {
+                                                    Ok(data_str) => {
+                                                        format!("0{}", data_str)
+                                                    },
+                                                    Err(_) => {
+                                                        String::from("2000000000") //Non-ascii data
+                                                    }
+                                                }
+                                            } else {
+                                                String::from("3000000000") //Wrong data packet size
+                                            }
+                                        } else {
+                                            String::from("1000000000") //Bad parity
                                         }
                                     };
 
-                                    index += 1;
-                                }
-
-                                if usb_reader_buffer[1] == DATA_TERMINATOR {
-
-
-                                    //Modify the last bytes for a Windows vs Unix newline
-                                    let data = if is_unix_newline {
-                                        tenma_data_buffer[10] = '\n' as u8;
-                                        &tenma_data_buffer[0..11]
-                                    } else {
-                                        tenma_data_buffer[10] = '\r' as u8;
-                                        tenma_data_buffer[11] = '\n' as u8;
-                                        &tenma_data_buffer
-                                    } ;
-
                                     if dt_format.is_empty() {
-                                        print!("{}", std::str::from_utf8(data).unwrap());
+                                        println!("{}", output_string);
                                     }
                                     else {
-                                        print!("{} {}", chrono::Utc::now().format(dt_format), std::str::from_utf8(data).unwrap());
+                                        println!("{} {}", chrono::Utc::now().format(dt_format), output_string);
                                     }
+
+                                    bad_parity = false;
+
                                 }
                             }
                             Err(err) => panic!("could not read from endpoint: {}", err),

@@ -9,6 +9,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Unfinished Ideas
 
+## [0.1.4] - 2021-03-14
+
+### Changed
+- The `tenma_data_buffer` variable now implemented as a vector instead of an array
+- Overhaul of the main logic
+- Interrupted communications now results in outputting error codes (in first character of data output) instead of panic
+
+### Fixed
+- Removed left over debug eprintln statements
+
+### Removed
+- All newline logic is removed. Newline characters are truncated and instead we use println! to print newline
+
 ## [0.1.3] - 2021-03-13
 
 ### Added

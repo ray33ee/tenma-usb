@@ -7,14 +7,10 @@ Tested on Tenma 72-7732A.
 # Output
 
 Without any command line options, a successful read from the device will print 12 characters.
-The first character is an ascii '0' or '1' indicating the success or fail, respectively of the parity check for the received data.
-The next 11 characters are the data from the device.
+The first character is an ascii digit error code. A code of '0' means success, any other value is a fail.
+The next 9 characters are the data from the device.
 
 # Options
-
-## Newline
-
-By default the last two aharacters are always a CRLF terminator. However this can be modified to be unix compatible with the '-n="unix"' option.
 
 ## Time stamp
 
